@@ -16,6 +16,8 @@ int motorENA = 6;
 int motorIn1 = 8;
 int motorIn2 = 7;
 
+float oldAngleGyro = 90;
+
 
 void setup() {
   // put your setup code here, to run once:
@@ -68,45 +70,42 @@ void loop() {
   sensors_event_t a, g, temp;
   mpu.getEvent(&a, &g, &temp);
 
-  /* Print out the values */
-  Serial.print("Acceleration X: ");
-  Serial.print(a.acceleration.x);
-  Serial.print(", Y: ");
-  Serial.print(a.acceleration.y);
-  Serial.print(", Z: ");
-  Serial.print(a.acceleration.z);
-  Serial.println(" m/s^2");
-
-  Serial.print("Rotation X: ");
-  Serial.print(g.gyro.x * 180 / PI);
-  Serial.print(", Y: ");
-  Serial.print(g.gyro.y * 180 / PI);
-  Serial.print(", Z: ");
-  Serial.print(g.gyro.z * 180 / PI);
-  Serial.println(" deg/s");
-
-  //degrees using gyro
-  Serial.print("Ratio (z/x): ");
-
-  float ratio = constrain(constrain(a.acceleration.z, 0.01, 9.5) / constrain(a.acceleration.x, -9.5, 9.5), -6, 6);
-
-  Serial.println(ratio);
-  Serial.print("Angle (using gyro):");
-
-  float eq = 72.5003 * pow(abs(ratio), 0.253558) - 22.8643;
-  float angle;
-  if (ratio < 0) {
-    angle = 90 + (90 - eq);
-  } else if (ratio > 0) {
-    angle = eq;
-  }
-
-  Serial.println(angle);
-
 
   //degrees using accel
 
+  float ratio = constrain(constrain(a.acceleration.z, 0.01, 9.5) / constrain(a.acceleration.x, -9.5, 9.5), -6, 6);
+
+  float eq = 72.5003 * pow(abs(ratio), 0.253558) - 22.8643;
+  float angleAccel;
+  if (ratio < 0) {
+    angleAccel = 90 + (90 - eq);
+  } else if (ratio > 0) {
+    angleAccel = eq;
+  }
+
+  //degrees using gyro
+
+  float newAngleGyro = oldAngleGyro + (g.gyro.y * 180 / PI) * 0.05;
+
+  float compAngle = (0.1 * newAngleGyro)+ (0.9 * angleAccel);
+
+  Serial.print("angle_gyro:");
+  Serial.print(newAngleGyro);
+  Serial.print(",");
+  Serial.print("angle_accel:");
+  Serial.print(angleAccel);
+  Serial.print(",");
+  Serial.print("angle_accel_lowpass:");
+  Serial.print(angleAccelLowPass);
+  Serial.print(",");
+  Serial.print("complementary_angle:");
+  Serial.print(compAngle);
+  Serial.print(",");
+  Serial.print("static_var:");
+  Serial.println(90);
+
+  oldAngleGyro = newAngleGyro;
 
   Serial.println("");
-  delay(250);
+  delay(50);
 }
