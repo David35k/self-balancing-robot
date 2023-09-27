@@ -6,6 +6,9 @@
 
 Adafruit_MPU6050 mpu;
 
+float xn1 = 0;
+float yn1 = 0;
+
 //right motor
 int motorENB = 5;
 int motorIn3 = 4;
@@ -17,6 +20,16 @@ int motorIn1 = 8;
 int motorIn2 = 7;
 
 float oldAngleGyro = 90;
+
+// PID stuff
+float targetAngle = 90;
+float prevError = 0;
+float prevIntegral = 0;
+float kP = 0.9;
+float kI = 0.8;
+float kD = 0.5;
+float bias = 0;
+float iterationTime = 0.05;
 
 
 void setup() {
@@ -56,22 +69,12 @@ void setup() {
 }
 
 void loop() {
-  // put your main code here, to run repeatedly:
-  // analogWrite(motorENB, 255);
-  digitalWrite(motorIn3, HIGH);
-  digitalWrite(motorIn4, LOW);
-
-  // analogWrite(motorENA, 175);
-  digitalWrite(motorIn2, LOW);
-  digitalWrite(motorIn1, HIGH);
-
-
-  /* Get new sensor events with the readings */
+  // Get new sensor events with the readings
   sensors_event_t a, g, temp;
   mpu.getEvent(&a, &g, &temp);
 
 
-  //degrees using accel
+  // ----- degrees using accel -----
 
   float ratio = constrain(constrain(a.acceleration.z, 0.01, 9.5) / constrain(a.acceleration.x, -9.5, 9.5), -6, 6);
 
@@ -83,29 +86,100 @@ void loop() {
     angleAccel = eq;
   }
 
-  //degrees using gyro
+  //low pass filter - makes it nice and smooth
+  float filt = 0.5;
+  float angleAccelLowPass = (1 - filt) * yn1 + (filt / 2) * xn1 + (filt / 2) * angleAccel;
 
-  float newAngleGyro = oldAngleGyro + (g.gyro.y * 180 / PI) * 0.05;
+  xn1 = angleAccel;
+  yn1 = angleAccelLowPass;
 
-  float compAngle = (0.1 * newAngleGyro)+ (0.9 * angleAccel);
+
+  // ----- degrees using gyro -----
+
+  float newAngleGyro = oldAngleGyro + (g.gyro.y * 180 / PI) * iterationTime;
+
+  if (newAngleGyro - angleAccel > 45 || newAngleGyro - angleAccel < -45) {
+    newAngleGyro = angleAccel;
+  }
+
+  oldAngleGyro = newAngleGyro;
+
+  //complementary filter - idk if im doing this right :skull:
+  float compAngle = (0.1 * newAngleGyro) + (0.9 * angleAccelLowPass);
+
+  //PID
+  float error = targetAngle - compAngle;
+  float i = prevIntegral + error * iterationTime;
+  float d = (error - prevError) / iterationTime;
+  float output = kP * error + kI * i + kD * d;
+
+  prevError = error;
+  prevIntegral = i;
+
+  // analogWrite(motorENB, constrain(abs(output*2), 140, 250));
+  // analogWrite(motorENA, constrain(abs(output*2), 140, 250));
+  analogWrite(motorENB, constrain(abs(output*3), 150, 250));
+  analogWrite(motorENA, constrain(abs(output*3), 150, 175));
+
+  // analogWrite(motorENB, 150);
+  // analogWrite(motorENA, 150);
+
+  // // right motor
+  // digitalWrite(motorIn3, HIGH);
+  // digitalWrite(motorIn4, LOW);
+
+  // //left motor
+  // digitalWrite(motorIn2, LOW);
+  // digitalWrite(motorIn1, HIGH);
+
+  // delay(1000);
+
+  // //right motor
+  // digitalWrite(motorIn3, LOW);
+  // digitalWrite(motorIn4, HIGH);
+
+  // //left motor
+  // digitalWrite(motorIn2, HIGH);
+  // digitalWrite(motorIn1, LOW);
+
+  // delay(1000);
+
+  if (output < 0) {
+    //right motor
+    digitalWrite(motorIn3, HIGH);
+    digitalWrite(motorIn4, LOW);
+
+    //left motor
+    digitalWrite(motorIn2, LOW);
+    digitalWrite(motorIn1, HIGH);
+  } else {
+    //right motor
+    digitalWrite(motorIn3, LOW);
+    digitalWrite(motorIn4, HIGH);
+
+    //left motor
+    digitalWrite(motorIn2, HIGH);
+    digitalWrite(motorIn1, LOW);
+  }
 
   Serial.print("angle_gyro:");
   Serial.print(newAngleGyro);
   Serial.print(",");
+  Serial.print("angle_accel_low_pass:");
+  Serial.print(angleAccelLowPass);
+  Serial.print(",");
   Serial.print("angle_accel:");
   Serial.print(angleAccel);
-  Serial.print(",");
-  Serial.print("angle_accel_lowpass:");
-  Serial.print(angleAccelLowPass);
   Serial.print(",");
   Serial.print("complementary_angle:");
   Serial.print(compAngle);
   Serial.print(",");
-  Serial.print("static_var:");
+  Serial.print("target:");
   Serial.println(90);
-
-  oldAngleGyro = newAngleGyro;
+  Serial.print(",");
+  Serial.print("output:");
+  Serial.println(output);
 
   Serial.println("");
-  delay(50);
+  delay(iterationTime * 1000);
 }
