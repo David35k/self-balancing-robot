@@ -76,7 +76,7 @@ void loop() {
 
   // ----- degrees using accel -----
 
-  float ratio = constrain(constrain(a.acceleration.z, 0.01, 9.5) / constrain(a.acceleration.x, -9.5, 9.5), -6, 6);
+  float ratio = constrain(constrain(a.acceleration.z, 0.01, 9.5) / constrain(a.acceleration.y, -9.5, 9.5), -6, 6);
 
   float eq = 72.5003 * pow(abs(ratio), 0.253558) - 22.8643;
   float angleAccel;
@@ -96,7 +96,7 @@ void loop() {
 
   // ----- degrees using gyro -----
 
-  float newAngleGyro = oldAngleGyro + (g.gyro.y * 180 / PI) * iterationTime;
+  float newAngleGyro = oldAngleGyro + (g.gyro.x * 180 / PI) * iterationTime;
 
   if (newAngleGyro - angleAccel > 45 || newAngleGyro - angleAccel < -45) {
     newAngleGyro = angleAccel;
@@ -144,7 +144,7 @@ void loop() {
 
   // delay(1000);
 
-  if (output < 0) {
+  if (output > 0) {
     //right motor
     digitalWrite(motorIn3, HIGH);
     digitalWrite(motorIn4, LOW);
