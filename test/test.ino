@@ -25,11 +25,14 @@ float oldAngleGyro = 6969;
 float targetAngle = 90;
 float prevError = 0;
 float prevIntegral = 0;
-float kP = 0.8;
-float kI = 0.1;
-float kD = 0.03;
+float kP = 0.2;
+float kI = 0;
+float kD = 0;
+// float kP = 0.1;
+// float kI = 0.03;
+// float kD = 0.005;
 float bias = 0;
-float iterationTime = 0.05;
+float iterationTime = 0.02;
 
 
 void setup() {
@@ -84,6 +87,8 @@ void loop() {
     angleAccel = 90 + (90 - eq);
   } else if (ratio < 0) {
     angleAccel = eq;
+  } else if (ratio == 0) {
+    angleAccel = 90;
   }
 
   //sus stuff
@@ -91,26 +96,20 @@ void loop() {
     oldAngleGyro = angleAccel;
   }
 
-  //low pass filter - makes it nice and smooth
-  float filt = 0.5;
-  float angleAccelLowPass = (1 - filt) * yn1 + (filt / 2) * xn1 + (filt / 2) * angleAccel;
-
-  xn1 = angleAccel;
-  yn1 = angleAccelLowPass;
-
+  
 
   // ----- degrees using gyro -----
 
   float newAngleGyro = oldAngleGyro + (g.gyro.x * 180 / PI) * iterationTime;
 
-  if (newAngleGyro - angleAccel > 45 || newAngleGyro - angleAccel < -45) {
+  if (newAngleGyro - angleAccel > 10 || newAngleGyro - angleAccel < -10) {
     newAngleGyro = angleAccel;
   }
 
   oldAngleGyro = newAngleGyro;
 
   //complementary filter - idk if im doing this right :skull:
-  float compAngle = (0.1 * newAngleGyro) + (0.9 * angleAccelLowPass);
+  float compAngle = (0.5 * newAngleGyro) + (0.5 * angleAccel);
 
   //PID
   float error = targetAngle - compAngle;
@@ -121,7 +120,7 @@ void loop() {
   prevError = error;
   prevIntegral = i;
 
-   if (output < 0) {
+   if (outputLowPass < 0) {
     //right motor
     digitalWrite(motorIn3, HIGH);
     digitalWrite(motorIn4, LOW);
@@ -139,8 +138,18 @@ void loop() {
     digitalWrite(motorIn1, LOW);
   }
 
-  analogWrite(motorENB, map(abs(output), 0, 125, 65, 255));
-  analogWrite(motorENA, map(abs(output), 0, 125, 65, 255));
+  int sus = constrain(abs(outputLowPass), 0, 10);
+  sus = map(sus, 0, 10, 50, 255);
+
+  //low pass filter - makes it nice and smooth
+  float filt = 0.5;
+  float susLowPass = (1 - filt) * yn1 + (filt / 2) * xn1 + (filt / 2) * sus;
+
+  xn1 = sus;
+  yn1 = susLowPass;
+
+  analogWrite(motorENB, susLowPass);
+  analogWrite(motorENA, susLowPass);
   // analogWrite(motorENA, constrain(abs(output*5), 55, 175));
   // analogWrite(motorENB, constrain(abs(output), 150, 250));
   // analogWrite(motorENA, constrain(abs(output), 150, 175));
@@ -150,8 +159,8 @@ void loop() {
   Serial.print("angle_gyro:");
   Serial.print(newAngleGyro);
   Serial.print(",");
-  Serial.print("angle_accel_low_pass:");
-  Serial.print(angleAccelLowPass);
+  // Serial.print("angle_accel_low_pass:");
+  // Serial.print(angleAccelLowPass);
   Serial.print(",");
   Serial.print("angle_accel:");
   Serial.print(angleAccel);
@@ -162,8 +171,11 @@ void loop() {
   Serial.print("target:");
   Serial.println(90);
   Serial.print(",");
-  Serial.print("output:");
-  Serial.println(output);
+  Serial.print("outputLowPass:");
+  Serial.println(outputLowPass);
+  Serial.print(",");
+  Serial.print("motors:");
+  Serial.println(map(susLowPass, 0, 10, 50, 255));
 
   Serial.println("");
   delay(iterationTime * 1000);
