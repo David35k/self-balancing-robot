@@ -19,15 +19,15 @@ int motorENA = 6;
 int motorIn1 = 8;
 int motorIn2 = 7;
 
-float oldAngleGyro = 90;
+float oldAngleGyro = 6969;
 
 // PID stuff
 float targetAngle = 90;
 float prevError = 0;
 float prevIntegral = 0;
-float kP = 0.9;
-float kI = 0.8;
-float kD = 0.5;
+float kP = 0.8;
+float kI = 0.1;
+float kD = 0.03;
 float bias = 0;
 float iterationTime = 0.05;
 
@@ -80,10 +80,15 @@ void loop() {
 
   float eq = 72.5003 * pow(abs(ratio), 0.253558) - 22.8643;
   float angleAccel;
-  if (ratio < 0) {
+  if (ratio > 0) {
     angleAccel = 90 + (90 - eq);
-  } else if (ratio > 0) {
+  } else if (ratio < 0) {
     angleAccel = eq;
+  }
+
+  //sus stuff
+  if(oldAngleGyro == 6969) {
+    oldAngleGyro = angleAccel;
   }
 
   //low pass filter - makes it nice and smooth
@@ -116,35 +121,7 @@ void loop() {
   prevError = error;
   prevIntegral = i;
 
-  // analogWrite(motorENB, constrain(abs(output*2), 140, 250));
-  // analogWrite(motorENA, constrain(abs(output*2), 140, 250));
-  analogWrite(motorENB, constrain(abs(output*3), 150, 250));
-  analogWrite(motorENA, constrain(abs(output*3), 150, 175));
-
-  // analogWrite(motorENB, 150);
-  // analogWrite(motorENA, 150);
-
-  // // right motor
-  // digitalWrite(motorIn3, HIGH);
-  // digitalWrite(motorIn4, LOW);
-
-  // //left motor
-  // digitalWrite(motorIn2, LOW);
-  // digitalWrite(motorIn1, HIGH);
-
-  // delay(1000);
-
-  // //right motor
-  // digitalWrite(motorIn3, LOW);
-  // digitalWrite(motorIn4, HIGH);
-
-  // //left motor
-  // digitalWrite(motorIn2, HIGH);
-  // digitalWrite(motorIn1, LOW);
-
-  // delay(1000);
-
-  if (output > 0) {
+   if (output < 0) {
     //right motor
     digitalWrite(motorIn3, HIGH);
     digitalWrite(motorIn4, LOW);
@@ -161,6 +138,14 @@ void loop() {
     digitalWrite(motorIn2, HIGH);
     digitalWrite(motorIn1, LOW);
   }
+
+  analogWrite(motorENB, map(abs(output), 0, 125, 65, 255));
+  analogWrite(motorENA, map(abs(output), 0, 125, 65, 255));
+  // analogWrite(motorENA, constrain(abs(output*5), 55, 175));
+  // analogWrite(motorENB, constrain(abs(output), 150, 250));
+  // analogWrite(motorENA, constrain(abs(output), 150, 175));
+
+ 
 
   Serial.print("angle_gyro:");
   Serial.print(newAngleGyro);
