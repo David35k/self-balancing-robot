@@ -9,6 +9,9 @@ Adafruit_MPU6050 mpu;
 float xn1 = 0;
 float yn1 = 0;
 
+float xn2 = 0;
+float yn2 = 0;
+
 //right motor
 int motorENB = 5;
 int motorIn3 = 4;
@@ -25,14 +28,14 @@ float oldAngleGyro = 6969;
 float targetAngle = 90;
 float prevError = 0;
 float prevIntegral = 0;
-float kP = 0.2;
-float kI = 0;
-float kD = 0;
-// float kP = 0.1;
-// float kI = 0.03;
-// float kD = 0.005;
+// float kP = 0.20;
+// float kI = 0.05;
+// float kD = 0;
+float kP = 0.15;
+float kI = 0.02;
+float kD = 0.00065;
 float bias = 0;
-float iterationTime = 0.02;
+float iterationTime = 0.05;
 
 
 void setup() {
@@ -109,7 +112,7 @@ void loop() {
   oldAngleGyro = newAngleGyro;
 
   //complementary filter - idk if im doing this right :skull:
-  float compAngle = (0.5 * newAngleGyro) + (0.5 * angleAccel);
+  float compAngle = (0.2 * newAngleGyro) + (0.8 * angleAccel);
 
   //PID
   float error = targetAngle - compAngle;
@@ -120,7 +123,27 @@ void loop() {
   prevError = error;
   prevIntegral = i;
 
-   if (outputLowPass < 0) {
+  //low pass filter - makes it nice and smooth
+  float filt = 0.8;
+  float outputLowPass = (1 - filt) * yn2 + (filt / 2) * xn2 + (filt / 2) * output;
+
+  xn2 = output;
+  yn2 = outputLowPass;
+
+  int sus = constrain(abs(output), 0, 10);
+  sus = map(sus, 0, 10, 50, 255);
+
+  //low pass filter - makes it nice and smooth
+  float filt2 = 0.1;
+  float susLowPass = (1 - filt2) * yn1 + (filt2 / 2) * xn1 + (filt2 / 2) * sus;
+
+  xn1 = sus;
+  yn1 = susLowPass;
+
+  analogWrite(motorENB, susLowPass);
+  analogWrite(motorENA, susLowPass);
+
+  if (output < 0) {
     //right motor
     digitalWrite(motorIn3, HIGH);
     digitalWrite(motorIn4, LOW);
@@ -137,19 +160,6 @@ void loop() {
     digitalWrite(motorIn2, HIGH);
     digitalWrite(motorIn1, LOW);
   }
-
-  int sus = constrain(abs(outputLowPass), 0, 10);
-  sus = map(sus, 0, 10, 50, 255);
-
-  //low pass filter - makes it nice and smooth
-  float filt = 0.5;
-  float susLowPass = (1 - filt) * yn1 + (filt / 2) * xn1 + (filt / 2) * sus;
-
-  xn1 = sus;
-  yn1 = susLowPass;
-
-  analogWrite(motorENB, susLowPass);
-  analogWrite(motorENA, susLowPass);
   // analogWrite(motorENA, constrain(abs(output*5), 55, 175));
   // analogWrite(motorENB, constrain(abs(output), 150, 250));
   // analogWrite(motorENA, constrain(abs(output), 150, 175));
@@ -171,11 +181,11 @@ void loop() {
   Serial.print("target:");
   Serial.println(90);
   Serial.print(",");
-  Serial.print("outputLowPass:");
+  Serial.print("outputlowpass:");
   Serial.println(outputLowPass);
   Serial.print(",");
   Serial.print("motors:");
-  Serial.println(map(susLowPass, 0, 10, 50, 255));
+  Serial.println(susLowPass);
 
   Serial.println("");
   delay(iterationTime * 1000);
